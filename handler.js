@@ -47,7 +47,6 @@ module.exports.demo = async (event, context, callback) => {
       let subsegment = AWSXRay.getSegment().addNewSubsegment("Downstream Service Call Failure");
       subsegment.addError(error, true);
       subsegment.addAnnotation("error", "DownstreamServiceCallFailure");
-      subsegment.addMetadata("error", error);
       subsegment.close();
       callback(null, {"statusCode": 500, "body": "Something isn't working..."});
     });
