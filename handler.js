@@ -4,25 +4,39 @@ var AWSXRay = require('aws-xray-sdk');
 AWSXRay.captureHTTPsGlobal(require('http'));
 
 var axios = require('axios');
+var stringify = require('json-stringify-safe');
 
 module.exports.demo = async (event, context, callback) => {
+
+  let subsegment = AWSXRay.getSegment().addNewSubsegment("Expensive Computation");
+  var start = new Date();
+  var now;
+  var sleepyTime = getRandomInt(1000, 2000)
+  while (true) {
+      now = new Date();
+      if (now - start >= 1000) {
+          break;
+      }
+  }
+  subsegment.close();
+
   let config1 = {
     method: 'GET',
-    url: 'http://service1.motyka.org/delay/' + getRandomInt(1,6),
-    timeout: 5000
+    url: 'http://service1.motyka.org/delay/' + getRandomInt(1,2),
+    timeout: 2000
   };
   let config2 = {
     method: 'GET',
-    url: 'http://service2.motyka.org/delay/' + getRandomInt(1,6),
-    timeout: 5000
+    url: 'http://service2.motyka.org/delay/' + getRandomInt(1,3),
+    timeout: 2000
   };
 
   var specialValues = ['foo', 'bar', 'baz']; 
   let config3 = {
     method: 'POST',
-    url: 'http://service3.motyka.org/delay/' + getRandomInt(1,6),
+    url: 'http://service3.motyka.org/delay/' + getRandomInt(1,4),
     data: '{"special":"' + specialValues[Math.floor(Math.random() * specialValues.length)] + '"}',
-    timeout: 5000
+    timeout: 3000
   };
 
   axios.interceptors.request.use(config => {
@@ -41,14 +55,15 @@ module.exports.demo = async (event, context, callback) => {
 
   Promise.all([axios(config1), axios(config2), axios(config3)])
     .then((response1, response2, response3) => {
-        callback(null, "All is well...");
+        callback(undefined, {"statusCode": 200, "body": "All is well..."});
     })
     .catch(error => {
       let subsegment = AWSXRay.getSegment().addNewSubsegment("Downstream Service Call Failure");
       subsegment.addError(error, true);
       subsegment.addAnnotation("error", "DownstreamServiceCallFailure");
+      subsegment.addMetadata("error", JSON.parse(stringify(error.request)));
       subsegment.close();
-      callback(null, {"statusCode": 500, "body": "Something isn't working..."});
+      callback(undefined, {"statusCode": 500, "body": "Something isn't working..."});
     });
 };
 
